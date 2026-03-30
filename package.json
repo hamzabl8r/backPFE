@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js",
     "client": "cd ../client && npm start",
     "back": "nodemon server.js",
     "dev": "concurrently --shell \"cmd.exe\" \"npm run back\" \"npm run client\""
