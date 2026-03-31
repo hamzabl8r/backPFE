@@ -17,7 +17,7 @@ const PORT = process.env.PORT || 5000;
 
 // 2. Middlewares de base
 app.use(cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    origin: "https://sign-translator-ih5s.vercel.app/" || "http://localhost:3000",
     credentials: true
 }));
 app.use(express.json());
@@ -38,7 +38,7 @@ app.use(passport.session());
 const server = http.createServer(app);
 const io = socketIo(server, {
     cors: {
-        origin: process.env.FRONTEND_URL || "http://localhost:3000",
+        origin: https://sign-translator-ih5s.vercel.app/ || "http://localhost:3000",
         methods: ["GET", "POST"],
         credentials: true
     },
@@ -56,7 +56,7 @@ app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'em
 app.get('/auth/google/callback', 
   passport.authenticate('google', { failureRedirect: '/login' }),
   (req, res) => {
-    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+    const frontendUrl = https://sign-translator-ih5s.vercel.app/ || "http://localhost:3000";
     res.redirect(`${frontendUrl}/profil`); 
   }
 );
