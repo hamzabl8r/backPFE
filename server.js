@@ -12,10 +12,8 @@ const socketIo = require('socket.io');
 
 const app = express();
 
-// 1. Port configuration
 const PORT = process.env.PORT || 5000;
 
-// 2. Middlewares de base
 app.use(cors({
     origin: [
         'http://localhost:3000', 
@@ -25,10 +23,8 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// 3. Connect to Database
 connectDB();
 
-// 4. Session & Passport configuration
 app.use(session({ 
     secret: process.env.SESSION_SECRET || 'ton_secret_key', 
     resave: false, 
@@ -37,7 +33,6 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 
-// 5. Create HTTP Server for Socket.io
 const server = http.createServer(app);
 const io = socketIo(server, {
     cors: {
@@ -51,9 +46,18 @@ const io = socketIo(server, {
     transports: ['websocket', 'polling']
 });
 
-// 6. Routes API (inchangé)
 app.get('/', (req, res) => {
     res.send('Server is running on Railway!');
+});
+
+// ✅ DEBUG ENDPOINT: check who is online (remove in production)
+app.get('/debug/online-users', (req, res) => {
+    const users = Array.from(userSockets.entries()).map(([userId, data]) => ({
+        userId,
+        socketId: data.socketId,
+        connected: data.socket?.connected
+    }));
+    res.json({ count: users.length, users });
 });
 
 app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
@@ -71,59 +75,68 @@ app.use('/user', Register);
 app.use('/api/messages', messageRoutes);
 app.use('/uploads/profile_pics', express.static(path.join(__dirname, 'uploads/profile_pics')));
 
-// 7. Socket.io Logic - VERSION CORRIGÉE
-const userSockets = new Map(); // userId -> { socketId, socket }
+// ✅ FIX: Use string keys consistently
+const userSockets = new Map(); // userId (string) -> { socketId, socket }
 
 io.on('connection', (socket) => {
     console.log('🔌 New client connected:', socket.id);
     
-    // Enregistrer l'utilisateur
     socket.on('register', (userId) => {
         if (!userId) {
             console.log('⚠️ Register event received without userId');
             return;
         }
+
+        // ✅ FIX: Always convert to string to avoid ObjectId vs string mismatch
+        const userIdStr = userId.toString();
         
-        console.log(`✅ Registering user ${userId} with socket ${socket.id}`);
+        console.log(`✅ Registering user ${userIdStr} with socket ${socket.id}`);
         
-        // Stocker l'utilisateur avec son socket ID
-        userSockets.set(userId, {
+        // ✅ FIX: If user was already registered (reconnect), clean up old entry
+        if (userSockets.has(userIdStr)) {
+            const oldEntry = userSockets.get(userIdStr);
+            console.log(`♻️ User ${userIdStr} reconnecting, replacing old socket ${oldEntry.socketId}`);
+        }
+        
+        userSockets.set(userIdStr, {
             socketId: socket.id,
             socket: socket
         });
         
-        // Stocker l'userId sur le socket pour la déconnexion
-        socket.userId = userId;
+        socket.userId = userIdStr;
         
-        // Confirmer l'enregistrement
         socket.emit('registered', { 
-            userId, 
+            userId: userIdStr, 
             socketId: socket.id,
             message: 'User registered successfully'
         });
         
-        console.log(`📊 Total connected users: ${userSockets.size}`);
-        
-        // Optionnel: envoyer la liste des utilisateurs connectés
         const connectedUsers = Array.from(userSockets.keys());
+        console.log(`📊 Total connected users: ${userSockets.size} → [${connectedUsers.join(', ')}]`);
+        
         socket.emit('users_online', connectedUsers);
+        
+        // ✅ FIX: Notify others that this user is now online
+        socket.broadcast.emit('user_online', { userId: userIdStr });
     });
     
-    // Gestion des messages chat (inchangé)
     socket.on('send_message', async (data) => {
         try {
-            console.log(`📨 Message from ${data.senderId} to ${data.receiverId}: ${data.text}`);
+            const senderIdStr = data.senderId?.toString();
+            const receiverIdStr = data.receiverId?.toString();
+            
+            console.log(`📨 Message from ${senderIdStr} to ${receiverIdStr}: ${data.text}`);
             
             const Message = require('./models/Message');
             const Conversation = require('./models/Conversation');
             
             let conversation = await Conversation.findOne({
-                participants: { $all: [data.senderId, data.receiverId] }
+                participants: { $all: [senderIdStr, receiverIdStr] }
             });
             
             if (!conversation) {
                 conversation = new Conversation({
-                    participants: [data.senderId, data.receiverId],
+                    participants: [senderIdStr, receiverIdStr],
                     unreadCount: new Map(),
                     lastMessageTime: new Date()
                 });
@@ -132,8 +145,8 @@ io.on('connection', (socket) => {
             
             const message = new Message({
                 conversationId: conversation._id,
-                sender: data.senderId,
-                receiver: data.receiverId,
+                sender: senderIdStr,
+                receiver: receiverIdStr,
                 text: data.text
             });
             await message.save();
@@ -144,20 +157,20 @@ io.on('connection', (socket) => {
             
             conversation.lastMessage = data.text;
             conversation.lastMessageTime = new Date();
-            const currentUnread = conversation.unreadCount.get(data.receiverId) || 0;
-            conversation.unreadCount.set(data.receiverId, currentUnread + 1);
+            const currentUnread = conversation.unreadCount.get(receiverIdStr) || 0;
+            conversation.unreadCount.set(receiverIdStr, currentUnread + 1);
             await conversation.save();
             
-            // Envoyer au destinataire
-            const receiver = userSockets.get(data.receiverId);
+            // ✅ FIX: Use string key
+            const receiver = userSockets.get(receiverIdStr);
             if (receiver && receiver.socket) {
-                console.log(`📤 Sending message to ${data.receiverId} via socket ${receiver.socketId}`);
+                console.log(`📤 Sending message to ${receiverIdStr} via socket ${receiver.socketId}`);
                 receiver.socket.emit('new_message', populatedMessage);
             } else {
-                console.log(`⚠️ Receiver ${data.receiverId} not connected`);
+                console.log(`⚠️ Receiver ${receiverIdStr} not connected`);
+                console.log(`   Online users: [${Array.from(userSockets.keys()).join(', ')}]`);
             }
             
-            // Confirmer à l'expéditeur
             socket.emit('message_sent', populatedMessage);
             
         } catch (error) {
@@ -166,17 +179,19 @@ io.on('connection', (socket) => {
         }
     });
     
-    // ========== VIDEO CALL HANDLERS CORRIGÉS ==========
+    // ========== VIDEO CALL HANDLERS ==========
     
-    // 1. Initier un appel
     socket.on('call_user', (data) => {
-        const { fromUserId, toUserId, signal, callerInfo } = data;
+        const fromUserId = data.fromUserId?.toString();
+        const toUserId = data.toUserId?.toString();
+        const { signal, callerInfo } = data;
+        
         console.log(`📞 CALL_USER: From ${fromUserId} to ${toUserId}`);
-        console.log(`   Caller info: ${callerInfo?.name}`);
+        console.log(`   Connected users: [${Array.from(userSockets.keys()).join(', ')}]`);
         
         const targetUser = userSockets.get(toUserId);
         
-        if (targetUser && targetUser.socket) {
+        if (targetUser && targetUser.socket && targetUser.socket.connected) {
             console.log(`✅ Forwarding call to ${toUserId} (socket: ${targetUser.socketId})`);
             
             targetUser.socket.emit('incoming_call', {
@@ -184,15 +199,23 @@ io.on('connection', (socket) => {
                 signal,
                 callerInfo: {
                     name: callerInfo?.name || 'Unknown',
-                    profilePic: callerInfo?.profilePic
+                    profilePic: callerInfo?.profilePic || null
                 },
                 callId: Date.now()
             });
             
-            console.log(`📞 Incoming call event sent to ${toUserId}`);
+            console.log(`📞 incoming_call event sent to ${toUserId}`);
         } else {
-            console.log(`❌ User ${toUserId} not connected or no socket found`);
-            console.log(`   Connected users: ${Array.from(userSockets.keys()).join(', ')}`);
+            // ✅ FIX: Better error logging
+            if (!targetUser) {
+                console.log(`❌ User ${toUserId} not found in userSockets map`);
+            } else if (!targetUser.socket) {
+                console.log(`❌ User ${toUserId} has no socket object`);
+            } else if (!targetUser.socket.connected) {
+                console.log(`❌ User ${toUserId} socket is disconnected`);
+                // Clean up stale entry
+                userSockets.delete(toUserId);
+            }
             
             socket.emit('call_error', {
                 error: 'User is not online',
@@ -201,16 +224,16 @@ io.on('connection', (socket) => {
         }
     });
     
-    // 2. Accepter un appel
     socket.on('accept_call', (data) => {
-        const { fromUserId, toUserId, signal } = data;
-        console.log(`✅ ACCEPT_CALL: From ${toUserId} to ${fromUserId}`);
+        const fromUserId = data.fromUserId?.toString();
+        const toUserId = data.toUserId?.toString();
+        const { signal } = data;
+        
+        console.log(`✅ ACCEPT_CALL: ${toUserId} accepting call from ${fromUserId}`);
         
         const callerUser = userSockets.get(fromUserId);
         
         if (callerUser && callerUser.socket) {
-            console.log(`✅ Forwarding acceptance to ${fromUserId}`);
-            
             callerUser.socket.emit('call_accepted', {
                 toUserId,
                 signal,
@@ -224,13 +247,13 @@ io.on('connection', (socket) => {
         }
     });
     
-    // 3. Rejeter un appel
     socket.on('reject_call', (data) => {
-        const { fromUserId, toUserId } = data;
-        console.log(`❌ REJECT_CALL: From ${toUserId} to ${fromUserId}`);
+        const fromUserId = data.fromUserId?.toString();
+        const toUserId = data.toUserId?.toString();
+        
+        console.log(`❌ REJECT_CALL: ${toUserId} rejected call from ${fromUserId}`);
         
         const callerUser = userSockets.get(fromUserId);
-        
         if (callerUser && callerUser.socket) {
             callerUser.socket.emit('call_rejected', {
                 fromUserId: toUserId,
@@ -239,13 +262,13 @@ io.on('connection', (socket) => {
         }
     });
     
-    // 4. Terminer un appel
     socket.on('end_call', (data) => {
-        const { fromUserId, toUserId } = data;
-        console.log(`🔚 END_CALL: Between ${fromUserId} and ${toUserId}`);
+        const fromUserId = data.fromUserId?.toString();
+        const toUserId = data.toUserId?.toString();
+        
+        console.log(`🔚 END_CALL: ${fromUserId} ended call with ${toUserId}`);
         
         const targetUser = userSockets.get(toUserId);
-        
         if (targetUser && targetUser.socket) {
             targetUser.socket.emit('call_ended', {
                 fromUserId,
@@ -254,9 +277,10 @@ io.on('connection', (socket) => {
         }
     });
     
-    // 5. Marquer les messages comme lus
     socket.on('mark_read', async (data) => {
-        const { conversationId, userId } = data;
+        const conversationId = data.conversationId;
+        const userId = data.userId?.toString();
+        
         console.log(`📖 Marking messages as read in conversation ${conversationId} for user ${userId}`);
         
         try {
@@ -267,8 +291,9 @@ io.on('connection', (socket) => {
                 conversation.unreadCount.set(userId, 0);
                 await conversation.save();
                 
-                // Notifier l'autre participant que les messages ont été lus
-                const otherParticipant = conversation.participants.find(p => p.toString() !== userId);
+                const otherParticipant = conversation.participants.find(
+                    p => p.toString() !== userId
+                );
                 if (otherParticipant) {
                     const otherUser = userSockets.get(otherParticipant.toString());
                     if (otherUser && otherUser.socket) {
@@ -284,24 +309,26 @@ io.on('connection', (socket) => {
         }
     });
     
-    // 6. Déconnexion
     socket.on('disconnect', () => {
         if (socket.userId) {
             console.log(`🔌 User ${socket.userId} disconnected (socket: ${socket.id})`);
-            userSockets.delete(socket.userId);
-            console.log(`📊 Remaining connected users: ${userSockets.size}`);
             
-            // Notifier les autres que l'utilisateur est déconnecté
-            io.emit('user_offline', { userId: socket.userId });
+            // ✅ FIX: Only delete if this socket is still the current one for this user
+            // (avoid deleting if user reconnected with a new socket)
+            const current = userSockets.get(socket.userId);
+            if (current && current.socketId === socket.id) {
+                userSockets.delete(socket.userId);
+                io.emit('user_offline', { userId: socket.userId });
+            }
+            
+            console.log(`📊 Remaining connected users: ${userSockets.size}`);
         } else {
             console.log(`🔌 Socket disconnected without userId: ${socket.id}`);
         }
     });
 });
 
-// 8. Listen on 0.0.0.0 (Obligatoire pour Railway)
 server.listen(PORT, '0.0.0.0', () => { 
     console.log(`🚀 Server is running on port ${PORT}`);
     console.log(`🔌 Socket.IO & Video calls are ready`);
-    console.log(`📡 WebSocket server listening on ws://0.0.0.0:${PORT}`);
 });

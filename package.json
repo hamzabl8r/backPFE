@@ -6,9 +6,9 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js",
-    "client": "cd ../client && npm start",
+    "SignTranslator": "cd ../SignTranslator && npm start",
     "back": "nodemon server.js",
-    "dev": "concurrently --shell \"cmd.exe\" \"npm run back\" \"npm run client\""
+    "dev": "concurrently --shell \"cmd.exe\" \"npm run back\" \"npm run SignTranslator\""
   },
   "keywords": [],
   "author": "",
@@ -16,7 +16,7 @@
   "type": "commonjs",
   "dependencies": {
     "bcrypt": "^6.0.0",
-    "concurrently": "^9.2.1",
+    "concurrently": "^7.6.0",
     "cors": "^2.8.6",
     "dotenv": "^17.2.4",
     "express": "^5.2.1",
@@ -30,6 +30,7 @@
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
     "passport-jwt": "^4.0.1",
+    "rxjs": "^7.8.1",
     "socket.io": "^4.8.3"
   }
 }
