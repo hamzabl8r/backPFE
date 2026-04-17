@@ -163,19 +163,22 @@ router.post("/login", loginRules(), validation, async (req, res) => {
   }
 });
 // forgot Password
+// forgot Password
 router.post('/forgot-password', async (req, res) => {
   try {
-    const user = await User.findOne( req.body.email );
+    // CORRECTION : Passer un objet de recherche { email: ... }
+    const user = await User.findOne({ email: req.body.email }); 
+    
     if (!user) {
       return res.status(404).json({ msg: 'User with this email does not exist.' });
     }
 
     const plainToken = crypto.randomBytes(20).toString('hex');
 
-   user.resetPasswordToken = crypto
+    user.resetPasswordToken = crypto
       .createHash('sha256')
       .update(plainToken)
-      .digest('hex');
+      .digest('hex'); 
       
     user.resetPasswordExpire = Date.now() + 10 * 60 * 1000; 
 
@@ -183,9 +186,19 @@ router.post('/forgot-password', async (req, res) => {
     
     const resetUrl = `http://localhost:3000/reset-password/${plainToken}`;
 
-    sendPasswordResetEmail(user, resetUrl);
-
-    res.status(200).json({ msg: 'Password reset link has been sent to your email.' });
+    // CORRECTION : Utiliser await pour s'assurer que l'envoi est tenté avant la réponse
+    try {
+      await sendPasswordResetEmail(user, resetUrl);
+      res.status(200).json({ msg: 'Password reset link has been sent to your email.' });
+    } catch (mailError) {
+      // Si l'email échoue, on annule les jetons dans la DB
+      user.resetPasswordToken = undefined;
+      user.resetPasswordExpire = undefined;
+      await user.save();
+      
+      console.error("Mail Delivery Error:", mailError);
+      res.status(500).json({ msg: 'Error sending email. Please try again later.' });
+    }
 
   } catch (error) {
     console.error("Forgot Password Error:", error);

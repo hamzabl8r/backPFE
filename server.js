@@ -50,7 +50,6 @@ app.get('/', (req, res) => {
     res.send('Server is running on Railway!');
 });
 
-// ✅ DEBUG ENDPOINT: check who is online (remove in production)
 app.get('/debug/online-users', (req, res) => {
     const users = Array.from(userSockets.entries()).map(([userId, data]) => ({
         userId,
@@ -75,8 +74,7 @@ app.use('/user', Register);
 app.use('/api/messages', messageRoutes);
 app.use('/uploads/profile_pics', express.static(path.join(__dirname, 'uploads/profile_pics')));
 
-// ✅ FIX: Use string keys consistently
-const userSockets = new Map(); // userId (string) -> { socketId, socket }
+const userSockets = new Map(); 
 
 io.on('connection', (socket) => {
     console.log('🔌 New client connected:', socket.id);
@@ -87,12 +85,10 @@ io.on('connection', (socket) => {
             return;
         }
 
-        // ✅ FIX: Always convert to string to avoid ObjectId vs string mismatch
         const userIdStr = userId.toString();
         
         console.log(`✅ Registering user ${userIdStr} with socket ${socket.id}`);
         
-        // ✅ FIX: If user was already registered (reconnect), clean up old entry
         if (userSockets.has(userIdStr)) {
             const oldEntry = userSockets.get(userIdStr);
             console.log(`♻️ User ${userIdStr} reconnecting, replacing old socket ${oldEntry.socketId}`);
@@ -116,7 +112,6 @@ io.on('connection', (socket) => {
         
         socket.emit('users_online', connectedUsers);
         
-        // ✅ FIX: Notify others that this user is now online
         socket.broadcast.emit('user_online', { userId: userIdStr });
     });
     
@@ -161,7 +156,6 @@ io.on('connection', (socket) => {
             conversation.unreadCount.set(receiverIdStr, currentUnread + 1);
             await conversation.save();
             
-            // ✅ FIX: Use string key
             const receiver = userSockets.get(receiverIdStr);
             if (receiver && receiver.socket) {
                 console.log(`📤 Sending message to ${receiverIdStr} via socket ${receiver.socketId}`);
@@ -206,14 +200,12 @@ io.on('connection', (socket) => {
             
             console.log(`📞 incoming_call event sent to ${toUserId}`);
         } else {
-            // ✅ FIX: Better error logging
             if (!targetUser) {
                 console.log(`❌ User ${toUserId} not found in userSockets map`);
             } else if (!targetUser.socket) {
                 console.log(`❌ User ${toUserId} has no socket object`);
             } else if (!targetUser.socket.connected) {
                 console.log(`❌ User ${toUserId} socket is disconnected`);
-                // Clean up stale entry
                 userSockets.delete(toUserId);
             }
             
@@ -313,8 +305,7 @@ io.on('connection', (socket) => {
         if (socket.userId) {
             console.log(`🔌 User ${socket.userId} disconnected (socket: ${socket.id})`);
             
-            // ✅ FIX: Only delete if this socket is still the current one for this user
-            // (avoid deleting if user reconnected with a new socket)
+           
             const current = userSockets.get(socket.userId);
             if (current && current.socketId === socket.id) {
                 userSockets.delete(socket.userId);
