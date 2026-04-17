@@ -2,6 +2,11 @@ const nodemailer = require('nodemailer');
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 
+console.log("Mailer Initializing...");
+console.log("EMAIL_USER exists:", !!process.env.EMAIL_USER);
+console.log("EMAIL_PASS exists:", !!process.env.EMAIL_PASS);
+console.log("SENDER_EMAIL:", process.env.SENDER_EMAIL);
+
 const transporter = nodemailer.createTransport({
     host: 'smtp-relay.brevo.com',
     port: 587,
@@ -10,6 +15,17 @@ const transporter = nodemailer.createTransport({
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
     },
+    debug: true,
+    logger: true
+});
+
+// Vérification de la connexion
+transporter.verify((error, success) => {
+    if (error) {
+        console.error('❌ Transporter verification failed:', error);
+    } else {
+        console.log('✅ Transporter is ready to send emails');
+    }
 });
 
 exports.sendPasswordResetEmail = async (user, resetUrl) => {
@@ -17,11 +33,9 @@ exports.sendPasswordResetEmail = async (user, resetUrl) => {
     
     try {
         const mailOptions = {
-            
-    from: `"MediSign Security" <${process.env.SENDER_EMAIL}>`, 
-    to: user.email,
-    subject: 'Reset Your MediSign Password 🔐',
-   
+            from: `"MediSign Security" <${process.env.SENDER_EMAIL}>`,
+            to: user.email,
+            subject: 'Reset Your MediSign Password 🔐',
             html: `
                 <div style="font-family: Arial, sans-serif; max-width: 600px;">
                     <h2>Password Reset Request</h2>
