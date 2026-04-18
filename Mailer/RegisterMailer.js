@@ -1,6 +1,6 @@
 const nodemailer = require('nodemailer');
-const path = require('path');
-require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
+const dotenv = require('dotenv');
+dotenv.config({ path: '../.env' });
 
 const transporter = nodemailer.createTransport({
     host: 'smtp-relay.brevo.com',
@@ -14,29 +14,29 @@ const transporter = nodemailer.createTransport({
 
 const sendWelcomeEmail = async (user) => {
     try {
-        const fullName = (user.firstName && user.lastName) 
-            ? `${user.firstName} ${user.lastName}` 
-            : (user.name || 'Valued User');
-
         const mailOptions = {
-            from: `"MediSign AI" <hamzabeji001@gmail.com>`, // Changed
+    from: `"MediSign AI" <${process.env.SENDER_EMAIL}>`,
     to: user.email,
-    subject: 'Welcome to MediSign! 🤟✨',
-            html: `
-                <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: auto; border: 1px solid #eee; padding: 20px;">
-                    <h2 style="color: #4A90E2; text-align: center;">Hello ${fullName},</h2>
-                    <p>Welcome to <strong>MediSign</strong>, your AI-powered bridge to seamless communication!</p>
-                    <p>We are thrilled to have you onboard.</p>
-                    <p>Best regards,<br>The MediSign Team</p>
-                </div>
-            `
-        };
+    subject: 'Welcome to MediSign AI 🎉',
+    html: `
+        <div style="background-color: #0F2854; padding: 40px; font-family: sans-serif; text-align: center;">
+            <div style="background-color: #1C4D8D; max-width: 500px; margin: auto; padding: 30px; border-radius: 10px; border: 1px solid #4988C4;">
+                <h1 style="color: #BDE8F5; margin-bottom: 10px;">Welcome, ${user.firstName} ${user.lastName}!</h1>
+                <p style="color: #FFFFFF; font-size: 18px;">We're thrilled to have you join <strong>MediSign AI</strong>.</p>
+                <p style="color: #FFFFFF; line-height: 1.6;">Our platform is designed to help you translate sign language in real-time. We can't wait to see how you use it!</p>
+                <a href="https://your-app-link.com/login" style="display: inline-block; background-color: #4988C4; color: #FFFFFF; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; margin: 25px 0;">Get Started</a>
+                <p style="color: #BDE8F5; font-size: 14px;">Need help? Reply to this email anytime.</p>
+            </div>
+            <p style="color: #4988C4; font-size: 12px; margin-top: 20px;">&copy; 2026 MediSign AI Team</p>
+        </div>
+    `
+};
 
         await transporter.sendMail(mailOptions);
-        console.log(`Welcome email sent successfully to ${user.email}`);
+        console.log("✅ Welcome email sent");
 
     } catch (error) {
-        console.error('Error sending welcome email:', error);
+        console.error("❌ Welcome mail error:", error);
     }
 };
 

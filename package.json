@@ -18,7 +18,7 @@
     "bcrypt": "^6.0.0",
     "concurrently": "^7.6.0",
     "cors": "^2.8.6",
-    "dotenv": "^17.2.4",
+    "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "express-session": "^1.19.0",
     "express-validator": "^7.3.1",

@@ -1,6 +1,6 @@
 const nodemailer = require('nodemailer');
-const path = require('path');
-require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
+const dotenv = require('dotenv');
+dotenv.config({ path: '../.env' });
 
 const transporter = nodemailer.createTransport({
     host: 'smtp-relay.brevo.com',
@@ -21,14 +21,15 @@ exports.handleContactForm = async (req, res) => {
         }
 
         const mailOptions = {
-            from: `"${name}" <hamzabeji001@gmail.com>`, // Changed
-    to: process.env.SENDER_EMAIL,
-    replyTo: email,
+            from: `"${name}" <${process.env.SENDER_EMAIL}>`,
+            to: process.env.SENDER_EMAIL,
+            replyTo: email,
             subject: `New Contact Form Message: ${subject}`,
             html: `
                 <h2>New message from contact form</h2>
                 <p><strong>Name:</strong> ${name}</p>
                 <p><strong>Email:</strong> ${email}</p>
+                <p><strong>Subject:</strong> ${subject}</p>
                 <p><strong>Message:</strong></p>
                 <p>${message}</p>
             `
