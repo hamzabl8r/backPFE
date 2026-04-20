@@ -188,6 +188,21 @@ io.on('connection', (socket) => {
             socket.emit('call_error', { error: 'User is not online' });
         }
     });
+    socket.on('send_translation', (data) => {
+    const toUserId = data.toUserId?.toString();
+    const fromUserId = data.fromUserId?.toString();
+    const { text } = data;
+
+    console.log(`📡 AI Translation from ${fromUserId} to ${toUserId}: ${text}`);
+
+    const targetUser = userSockets.get(toUserId);
+    if (targetUser && targetUser.socket) {
+        targetUser.socket.emit('receive_translation', {
+            text,
+            fromUserId
+        });
+    }
+});
 
     socket.on('accept_call', (data) => {
         const fromUserId = data.fromUserId?.toString();

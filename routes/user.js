@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const User = require("../models/users");
+const Activity = require("../models/Activity");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const multer = require("multer");
@@ -319,5 +320,67 @@ router.delete("/:id", async (req, res) => {
     res.send(error);
   }
 });
+// state user
+// router.get("/stats", async (req, res) => {
+//   try {
+//     const totalUsers = await User.countDocuments();
+//     const admins = await User.countDocuments({ isAdmin: true });
+
+//     const startOfMonth = new Date();
+//     startOfMonth.setDate(1);
+
+//     const newThisMonth = await User.countDocuments({
+//       createdAt: { $gte: startOfMonth },
+//     });
+
+//     const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+//     const activeUsers = await Activity.distinct("userId", {
+//       createdAt: { $gte: last24h },
+//     });
+
+//     res.json({
+//       totalUsers,
+//       admins,
+//       newThisMonth,
+//       activeUsers: activeUsers.length,
+//     });
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ msg: "Error fetching stats" });
+//   }
+// });
+// // get user activities
+// router.get("/activity", async (req, res) => {
+//   try {
+//     const activities = await Activity.find()
+//       .sort({ createdAt: -1 })
+//       .limit(20)
+//       .populate("userId", "firstName lastName ");
+
+//     res.json({ activities });
+//   } catch (err) {
+//     res.status(500).json({ msg: "Error fetching activity" });
+//   }
+// });
+// // Log Activity
+// router.post("/log-activity", async (req, res) => {
+//   try {
+//     const { userId, action, details } = req.body;
+
+//     const activity = new Activity({
+//       userId,
+//       action,
+//       details,
+//     });
+
+//     await activity.save();
+
+//     res.json({ msg: "Activity logged successfully" });
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ msg: "Error logging activity" });
+//   }
+// });
 
 module.exports = router;
