@@ -231,19 +231,17 @@ io.on('connection', (socket) => {
     });
 
     // ==================== AI TRANSLATION HANDLER ====================
-    // FIX: Was registered twice — only one handler should exist
     socket.on('send_translation', (data) => {
-        const toUserId = data.toUserId?.toString();
-        const fromUserId = data.fromUserId?.toString();
-        const { text } = data;
-
-        console.log(`📡 AI Translation from ${fromUserId} to ${toUserId}: ${text}`);
-
-        const targetUser = userSockets.get(toUserId);
-        if (targetUser?.socket) {
-            targetUser.socket.emit('receive_translation', { text, fromUserId });
-        }
-    });
+    const { text, toUserId, fromUserId } = data;
+    const targetUser = userSockets.get(toUserId?.toString());
+    
+    if (targetUser && targetUser.socket) {
+        targetUser.socket.emit('receive_translation', {
+            text: text,
+            fromUserId: fromUserId
+        });
+    }
+});
 
     // ==================== DISCONNECT ====================
     socket.on('disconnect', () => {
