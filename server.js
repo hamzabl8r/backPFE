@@ -70,6 +70,8 @@ app.get('/auth/google/callback',
 app.use('/user', Register);
 app.use('/api/messages', messageRoutes);
 app.use('/uploads/profile_pics', express.static(path.join(__dirname, 'uploads/profile_pics')));
+app.use('/history', require('./routes/history'));
+
 
 // ==================== SOCKET.IO + HTTP SERVER ====================
 const server = http.createServer(app);
